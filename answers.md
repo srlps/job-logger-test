@@ -18,8 +18,8 @@ Analisis:
 Proposal:
 ---
 * Use the singleton pattern to initialize and configure a single `JobLogger` instance
-* For configuration, use an `init` method
-* Use the attribute `initialized` to decide whether to log a message or not by configuring its value after every call to `init`
+* For configuration, use an `init` static method
+* Use the attribute `initialized` to decide whether to log a message or not by configuring its value after the `init` call
 * Configure every handler individually inside the `init` method
 * Use `Map<String, String>` for the `dbParams`  attribute and create a `fileParams` attribute to hold the configuration parameters for file handling
 * Create an internal `enum Level` to hold the 3 level constants
