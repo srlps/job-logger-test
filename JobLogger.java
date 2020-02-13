@@ -1,108 +1,163 @@
 import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.Statement;
+import java.sql.PreparedStatement;
 import java.text.DateFormat;
 import java.util.Date;
 import java.util.Map;
 import java.util.Properties;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.FileHandler;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class JobLogger {
-    private static boolean logToFile;
-    private static boolean logToConsole;
-    private static boolean logMessage;
-    private static boolean logWarning;
-    private static boolean logError;
-    private static boolean logToDatabase;
-    private boolean initialized;
-    private static Map dbParams;
-    private static Logger logger;
 
-    public JobLogger(boolean logToFileParam, boolean logToConsoleParam, boolean logToDatabaseParam,
-            boolean logMessageParam, boolean logWarningParam, boolean logErrorParam, Map dbParamsMap) {
+    private static JobLogger instance = new JobLogger();
+
+    private JobLogger() {
+        initialized = false;
         logger = Logger.getLogger("MyLog");
-        logError = logErrorParam;
-        logMessage = logMessageParam;
-        logWarning = logWarningParam;
-        logToDatabase = logToDatabaseParam;
-        logToFile = logToFileParam;
-        logToConsole = logToConsoleParam;
-        dbParams = dbParamsMap;
     }
 
-    public static void LogMessage(String messageText, boolean message, boolean warning, boolean error)
-            throws Exception {
-        messageText.trim();
-        if (messageText == null || messageText.length() == 0) {
+    public static JobLogger getInstance() {
+        return instance;
+    }
+
+    private boolean initialized;
+
+    private boolean logToFile;
+    private boolean logToConsole;
+    private boolean logToDatabase;
+
+    private boolean logMessage;
+    private boolean logWarning;
+    private boolean logError;
+
+    private Map<String, String> dbParams;
+    private Map<String, String> fileParams;
+
+    private Logger logger;
+    private PreparedStatement stmt;
+
+    public static void init(boolean logToFile, boolean logToConsole, boolean logToDatabase, boolean logMessage,
+            boolean logWarning, boolean logError, Map<String, String> dbParams, Map<String, String> fileParams) {
+        instance.logMessage = logMessage;
+        instance.logWarning = logWarning;
+        instance.logError = logError;
+
+        instance.dbParams = dbParams;
+        instance.fileParams = fileParams;
+
+        instance.logToFile = logToFile && configureFileLogging();
+        instance.logToConsole = logToConsole && configureConsoleLogging();
+        instance.logToDatabase = logToDatabase && configureDatabaseLogging();
+
+        instance.initialized = instance.logToFile || instance.logToConsole || instance.logToDatabase;
+    }
+
+    private static boolean configureFileLogging() {
+        try {
+            String path = instance.fileParams.get("logFileFolder") + "/logFile.txt";
+            File logFile = new File(path);
+            if (!logFile.exists()) {
+                logFile.createNewFile();
+            }
+            FileHandler fh = new FileHandler(path);
+            instance.logger.addHandler(fh);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+        return true;
+    }
+
+    private static boolean configureConsoleLogging() {
+        try {
+            ConsoleHandler ch = new ConsoleHandler();
+            instance.logger.addHandler(ch);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+        return true;
+    }
+
+    private static boolean configureDatabaseLogging() {
+        try {
+            Connection connection = null;
+            Properties connectionProps = new Properties();
+            connectionProps.put("user", instance.dbParams.get("userName"));
+            connectionProps.put("password", instance.dbParams.get("password"));
+
+            connection = DriverManager.getConnection("jdbc:" + instance.dbParams.get("dbms") + "://"
+                    + instance.dbParams.get("serverName") + ":" + instance.dbParams.get("portNumber") + "/",
+                    connectionProps);
+
+            instance.stmt = connection.prepareStatement("insert into Log values (?, ?)");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+        return true;
+    }
+
+    public void logMessage(String message, Level level) {
+        if (!initialized || message == null || level == null) {
             return;
         }
-        if (!logToConsole && !logToFile && !logToDatabase) {
-            throw new Exception("Invalid configuration");
+
+        String msg = message.trim();
+        if (msg.length() == 0) {
+            return;
         }
-        if ((!logError && !logMessage && !logWarning) || (!message && !warning && !error)) {
-            throw new Exception("Error or Warning or Message must be specified");
-        }
-
-        Connection connection = null;
-        Properties connectionProps = new Properties();
-        connectionProps.put("user", dbParams.get("userName"));
-        connectionProps.put("password", dbParams.get("password"));
-
-        connection = DriverManager.getConnection("jdbc:" + dbParams.get("dbms") + "://" + dbParams.get("serverName")
-                + ":" + dbParams.get("portNumber") + "/", connectionProps);
-
-        int t = 0;
-        if (message && logMessage) {
-            t = 1;
-        }
-
-        if (error && logError) {
-            t = 2;
-        }
-
-        if (warning && logWarning) {
-            t = 3;
-        }
-
-        Statement stmt = connection.createStatement();
 
         String l = null;
-        File logFile = new File(dbParams.get("logFileFolder") + "/logFile.txt");
-        if (!logFile.exists()) {
-            logFile.createNewFile();
+
+        switch (level) {
+        case MESSAGE:
+            if (!logMessage) {
+                return;
+            }
+            l = String.format("%s %s %s", "message", DateFormat.getDateInstance(DateFormat.LONG).format(new Date()),
+                    msg);
+            break;
+        case WARNING:
+            if (!logWarning) {
+                return;
+            }
+            l = String.format("%s %s %s", "warning", DateFormat.getDateInstance(DateFormat.LONG).format(new Date()),
+                    msg);
+            break;
+        case ERROR:
+            if (!logError) {
+                return;
+            }
+            l = String.format("%s %s %s", "error", DateFormat.getDateInstance(DateFormat.LONG).format(new Date()), msg);
+            break;
         }
 
-        FileHandler fh = new FileHandler(dbParams.get("logFileFolder") + "/logFile.txt");
-        ConsoleHandler ch = new ConsoleHandler();
-
-        if (error && logError) {
-            l = l + "error " + DateFormat.getDateInstance(DateFormat.LONG).format(new Date()) + messageText;
-        }
-
-        if (warning && logWarning) {
-            l = l + "warning " + DateFormat.getDateInstance(DateFormat.LONG).format(new Date()) + messageText;
-        }
-
-        if (message && logMessage) {
-            l = l + "message " + DateFormat.getDateInstance(DateFormat.LONG).format(new Date()) + messageText;
-        }
-
-        if (logToFile) {
-            logger.addHandler(fh);
-            logger.log(Level.INFO, messageText);
-        }
-
-        if (logToConsole) {
-            logger.addHandler(ch);
-            logger.log(Level.INFO, messageText);
+        if (logToFile || logToConsole) {
+            logger.log(java.util.logging.Level.INFO, l);
         }
 
         if (logToDatabase) {
-            stmt.executeUpdate("insert into Log_Values('" + message + "', " + String.valueOf(t) + ")");
+            try {
+                stmt.setString(1, l);
+                stmt.setString(2, String.valueOf(level.t));
+                stmt.executeUpdate();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public static enum Level {
+        MESSAGE(1), WARNING(3), ERROR(2);
+
+        public final int t;
+
+        private Level(int t) {
+            this.t = t;
         }
     }
 }

@@ -25,4 +25,4 @@ Proposal:
 * Create an internal `enum Level` to hold the 3 level constants
 * Change `LogMessage` method to `logMessage` with 2 parameters: `String message` and `Level level`
 * Use `PreparedStatement` instead of `Statement` to prevent sql injection
-* Use `"inser into Log values (?, ?)"` as the query template
+* Use `"insert into Log values (?, ?)"` as the query template
