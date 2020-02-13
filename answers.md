@@ -13,6 +13,7 @@ Analisis:
     * String variable `l` is never initialized and subsequent calls will throw `NullPointerException`
     * `logger.addHandler` is invoked everytime a message is logged
     * `stmt.executeUpdate` is vulnerable to sql injection
+    * `"insert into Log_Values('" + message + "', " + String.valueOf(t) + ")"` is not a valid sql query
 
 Proposal:
 ---
@@ -20,6 +21,8 @@ Proposal:
 * For configuration, use an `init` method
 * Use the attribute `initialized` to decide whether to log a message or not by configuring its value after every call to `init`
 * Configure every handler individually inside the `init` method
+* Use `Map<String, String>` for the `dbParams`  attribute and create a `fileParams` attribute to hold the configuration parameters for file handling
 * Create an internal `enum Level` to hold the 3 level constants
 * Change `LogMessage` method to `logMessage` with 2 parameters: `String message` and `Level level`
 * Use `PreparedStatement` instead of `Statement` to prevent sql injection
+* Use `"inser into Log values (?, ?)"` as the query template
