@@ -24,5 +24,7 @@ Proposal:
 * Use `Map<String, String>` for the `dbParams`  attribute and create a `fileParams` attribute to hold the configuration parameters for file handling
 * Create an internal `enum Level` to hold the 3 level constants
 * Change `LogMessage` method to `logMessage` with 2 parameters: `String message` and `Level level`
+* Change the date format to `yyyy-MM-dd HH:mm:ss.SSS`
+* Change the logger formatter to use the single line format proposed
 * Use `PreparedStatement` instead of `Statement` to prevent sql injection
 * Use `"insert into Log values (?, ?)"` as the query template
